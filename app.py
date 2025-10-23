@@ -42,11 +42,16 @@ def previsao(interpreter, image):
     interpreter.invoke()
 
     output_data = interpreter.get_tensor(output_details[0]['index'])
+
+    
     classes = ['BlackMeasles', 'BlackRot', 'HealthGrapes', 'LeafBlight']
 
     df = pd.DataFrame()
     df['classes'] = classes
-    df['probabilidades (%)'] = 100 * output_data[0].flatten()
+
+    probabilidades = np.squeeze(output_data)
+    df['probabilidades (%)'] = 100 * probabilidades
+
     fig = px.bar(df, y = 'classes', x = 'probabilidades (%)', orientation='h', text='probabilidades (%)',
                  title = 'Probabilidade de classes de Doenças em Uvas')
     st.plotly_chart(fig)
