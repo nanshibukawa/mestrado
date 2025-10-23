@@ -88,7 +88,12 @@ def main():
     st.write("# Classifica folha s de videira!")
 
     # Carrega modelo
-    path_url = "https://drive.google.com/file/d/1R4Oay2HAwm5RajQOwtnV4THKHaM5LJiU/view?usp=sharing"
+    # path_url = "https://drive.google.com/file/d/1R4Oay2HAwm5RajQOwtnV4THKHaM5LJiU/view?usp=sharing"
+    path_url = st.text_input(
+        "Cole a URL da imagem (Google Drive ou Link Direto) aqui:",
+        value=""
+    )
+    
     interpreter = carrega_modelo(path_url)
     image = carrega_imagem()
 
