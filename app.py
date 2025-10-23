@@ -20,7 +20,7 @@ def carrega_modelo():
 def carrega_imagem():
     uploaded_file = st.file_uploader("Arraste e solte uma imagaem ou clique para selecionar uma", type=["png", "jpg", "jpeg", "PNG", "JPG", "JPEG"])
 
-    if uploaded_file is not none:
+    if uploaded_file is not None:
         image_data = uploaded_file.read()
         image = Image.open(io.BytesIO(image_data))
 
