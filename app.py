@@ -25,7 +25,12 @@ def carrega_imagem():
     if uploaded_file is not None:
         image_data = uploaded_file.read()
         image = Image.open(io.BytesIO(image_data))
+        st.image(image, caption="Imagem Original", use_column_width=True)
+        st.success('Imagem carregada com sucesso')
 
+
+        TENSOR_SIZE = 256
+        image = image.resize((TENSOR_SIZE, TENSOR_SIZE))
         st.image(image)
         st.success('Imagem carregada com sucesso')
 
