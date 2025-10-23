@@ -116,7 +116,7 @@ def main():
         st.info("Agora, carregue a imagem da folha de videira para classificação.")
         image = carrega_imagem()
         if image is not None:
-            previsao(interpreter, image, classes)
+            previsao(interpreter, image, classes_list)
 
     # Carrega imagem
 
