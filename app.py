@@ -6,12 +6,14 @@ from PIL import Image
 import numpy as np
 import pandas as pd
 import plotly.express as px
+import re
 
 
 @st.cache_resource
-def carrega_modelo():
-    url = "https://drive.google.com/uc?id=1R4Oay2HAwm5RajQOwtnV4THKHaM5LJiU"
-    # url = "https://drive.google.com/file/d/1R4Oay2HAwm5RajQOwtnV4THKHaM5LJiU/view?usp=sharing"
+def carrega_modelo(path_url):
+    
+    url = converte_url_drive(path_url)
+    # url = "https://drive.google.com/uc?id=1R4Oay2HAwm5RajQOwtnV4THKHaM5LJiU"
     gdown.download(url, "modelo_quantizado16bits.tflite")
     interpreter = tf.lite.Interpreter(model_path='modelo_quantizado16bits.tflite')
     interpreter.allocate_tensors()
@@ -34,6 +36,26 @@ def carrega_imagem():
         image = np.expand_dims(image, axis=0)
 
         return image
+
+def converte_url_drive(url_compartilhamento):
+    """
+    Extrai o ID do arquivo do link de compartilhamento do Google Drive 
+    e o converte para o formato de download direto.
+    """
+    # Expressão regular para encontrar o ID. Ela busca o ID que vem depois de '/d/' ou 'id='
+    match = re.search(r'id=([a-zA-Z0-9_-]+)|/d/([a-zA-Z0-9_-]+)', url_compartilhamento)
+    
+    if match:
+        # match.group(1) captura o ID se for encontrado após 'id='
+        # match.group(2) captura o ID se for encontrado após '/d/'
+        file_id = match.group(1) if match.group(1) else match.group(2)
+        
+        # Constrói a URL de download no formato desejado
+        url_download_direto = f"https://drive.google.com/uc?id={file_id}"
+        return url_download_direto
+    else:
+        return None
+
 
 def previsao(interpreter, image):
     input_details = interpreter.get_input_details()
@@ -66,7 +88,8 @@ def main():
     st.write("# Classifica folha s de videira!")
 
     # Carrega modelo
-    interpreter = carrega_modelo()
+    path_url = "https://drive.google.com/file/d/1R4Oay2HAwm5RajQOwtnV4THKHaM5LJiU/view?usp=sharing"
+    interpreter = carrega_modelo(path_url)
     image = carrega_imagem()
 
     if image is not None:
