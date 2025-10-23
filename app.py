@@ -7,7 +7,7 @@ import numpy as np
 import pandas as pd
 import plotly.express as px
 import re
-
+import ast
 
 @st.cache_resource
 def carrega_modelo(path_url):
@@ -57,7 +57,7 @@ def converte_url_drive(url_compartilhamento):
         return None
 
 
-def previsao(interpreter, image):
+def previsao(interpreter, image, classes):
     input_details = interpreter.get_input_details()
     output_details = interpreter.get_output_details()
 
@@ -66,9 +66,6 @@ def previsao(interpreter, image):
     interpreter.invoke()
 
     output_data = interpreter.get_tensor(output_details[0]['index'])
-
-    
-    classes = ['BlackMeasles', 'BlackRot', 'HealthGrapes', 'LeafBlight']
 
     df = pd.DataFrame()
     df['classes'] = classes
@@ -93,9 +90,25 @@ def main():
         "Cole a URL da imagem (Google Drive ou Link Direto) aqui:",
         value=""
     )
+    classes_input_string = st.text_input( # Alterei o nome da variável
+        "Lista de classes (Ex: ['BlackMeasles', 'BlackRot', 'HealthGrapes', 'LeafBlight'])",
+        value="['BlackMeasles', 'BlackRot', 'HealthGrapes', 'LeafBlight']" # Adicionando um valor padrão para facilitar
+    )
+    
     interpreter = None
+    classes_list = None # Variável para armazenar a lista convertida
 
-    if model_url_input:
+    if classes_input_string:
+        try:
+            # Usamos ast.literal_eval para avaliar a string como um literal Python seguro
+            classes_list = ast.literal_eval(classes_input_string)
+            if not isinstance(classes_list, list):
+                 st.error("Erro na lista de classes: A entrada não é uma lista válida (deve começar e terminar com colchetes []).")
+                 classes_list = None
+        except Exception:
+            st.error("Erro na lista de classes: Verifique a sintaxe (certifique-se de que os itens estão entre aspas simples).")
+            classes_list = None
+    if model_url_input and classes_list is not None:
         interpreter = carrega_modelo(model_url_input)
 
     if interpreter is not None:
@@ -103,7 +116,7 @@ def main():
         st.info("Agora, carregue a imagem da folha de videira para classificação.")
         image = carrega_imagem()
         if image is not None:
-            previsao(interpreter, image)
+            previsao(interpreter, image, classes)
 
     # Carrega imagem
 
