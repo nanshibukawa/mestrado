@@ -89,16 +89,21 @@ def main():
 
     # Carrega modelo
     # path_url = "https://drive.google.com/file/d/1R4Oay2HAwm5RajQOwtnV4THKHaM5LJiU/view?usp=sharing"
-    path_url = st.text_input(
+    model_url_input = st.text_input(
         "Cole a URL da imagem (Google Drive ou Link Direto) aqui:",
         value=""
     )
-    
-    interpreter = carrega_modelo(path_url)
-    image = carrega_imagem()
+    interpreter = None
 
-    if image is not None:
-        previsao(interpreter, image)
+    if model_url_input:
+        interpreter = carrega_modelo(model_url_input)
+
+    if interpreter is not None:
+        st.success("Modelo carregado!")
+        st.info("Agora, carregue a imagem da folha de videira para classificação.")
+        image = carrega_imagem()
+        if image is not None:
+            previsao(interpreter, image)
 
     # Carrega imagem
 
