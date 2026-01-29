@@ -8,10 +8,10 @@ import pandas as pd
 import plotly.express as px
 import re
 import ast
+import time
 
 @st.cache_resource
 def carrega_modelo(path_url):
-    
     url = converte_url_drive(path_url)
     # url = "https://drive.google.com/uc?id=1R4Oay2HAwm5RajQOwtnV4THKHaM5LJiU"
     gdown.download(url, "modelo_quantizado16bits.tflite")
@@ -20,27 +20,30 @@ def carrega_modelo(path_url):
     return interpreter
 
 def carrega_imagem():
-    uploaded_file = st.file_uploader("Arraste e solte uma imagaem ou clique para selecionar uma", type=["png", "jpg", "jpeg", "PNG", "JPG", "JPEG"])
+    uploaded_file = st.file_uploader("Arraste e solte uma imagem ou clique para selecionar uma", type=["png", "jpg", "jpeg", "PNG", "JPG", "JPEG"])
 
     if uploaded_file is not None:
         image_data = uploaded_file.read()
         image = Image.open(io.BytesIO(image_data))
-        st.image(image, caption="Imagem Original", use_column_width=True)
-        st.success('Imagem carregada com sucesso')
+        
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            st.image(image, caption="Imagem Original", use_container_width=True)
+        
+        TENSOR_SIZE = 224
+        image_resized = image.resize((TENSOR_SIZE, TENSOR_SIZE))
+        
+        with col2:
+            st.image(image_resized, caption="Imagem Redimensionada (224x224)", use_container_width=True)
+        
+        st.success('✅ Imagem carregada com sucesso')
 
+        image_converted = image_resized.convert('RGB')
+        image_array = np.array(image_converted, dtype=np.float32)
+        image_array = np.expand_dims(image_array, axis=0)
 
-        TENSOR_SIZE = 256
-        image = image.resize((TENSOR_SIZE, TENSOR_SIZE))
-        st.image(image)
-        st.success('Imagem carregada com sucesso')
-
-        image = image.convert('RGB')
-
-        image = np.array(image, dtype=np.float32)
-        image = image / 255.0
-        image = np.expand_dims(image, axis=0)
-
-        return image
+        return image_array
 
 def converte_url_drive(url_compartilhamento):
     """
@@ -66,66 +69,122 @@ def previsao(interpreter, image, classes):
     input_details = interpreter.get_input_details()
     output_details = interpreter.get_output_details()
 
-    interpreter.set_tensor(input_details[0]['index'], image)
+    # Medir tempo de inferência
+    tempo_inicio = time.time()
     
+    interpreter.set_tensor(input_details[0]['index'], image)
     interpreter.invoke()
 
     output_data = interpreter.get_tensor(output_details[0]['index'])
+    
+    tempo_fim = time.time()
+    tempo_inferencia_ms = (tempo_fim - tempo_inicio) * 1000
 
     df = pd.DataFrame()
     df['classes'] = classes
 
     probabilidades = np.squeeze(output_data)
     df['probabilidades (%)'] = 100 * probabilidades
+    
+    # Encontrar classe com maior probabilidade
+    classe_predita = df.loc[df['probabilidades (%)'].idxmax(), 'classes']
+    confianca_max = df['probabilidades (%)'].max()
 
     fig = px.bar(df, y = 'classes', x = 'probabilidades (%)', orientation='h', text='probabilidades (%)',
-                 title = 'Probabilidade de classes de Doenças em Uvas')
+                 title = 'Classificação de Danos em Folhas de Soja')
     st.plotly_chart(fig)
+    
+    # Exibir informações de desempenho
+    st.markdown("---")
+    col1, col2, col3 = st.columns(3)
+    
+    with col1:
+        st.metric(
+            label="⚡ Tempo de Inferência",
+            value=f"{tempo_inferencia_ms:.2f} ms"
+        )
+    
+    with col2:
+        st.metric(
+            label="🎯 Classe Predita",
+            value=classe_predita
+        )
+    
+    with col3:
+        st.metric(
+            label="📊 Confiança",
+            value=f"{confianca_max:.2f}%"
+        )
 
 def main():
     st.set_page_config(
-        page_title="Classifica folha de videira"
-    )
-
-    st.write("# Classifica folha s de videira!")
-
-    # Carrega modelo
-    # path_url = "https://drive.google.com/file/d/1R4Oay2HAwm5RajQOwtnV4THKHaM5LJiU/view?usp=sharing"
-    model_url_input = st.text_input(
-        "Cole a URL da imagem (Google Drive ou Link Direto) aqui:",
-        value=""
-    )
-    classes_input_string = st.text_input( # Alterei o nome da variável
-        "Lista de classes (Ex: ['BlackMeasles', 'BlackRot', 'HealthGrapes', 'LeafBlight'])",
-        value="['BlackMeasles', 'BlackRot', 'HealthGrapes', 'LeafBlight']" # Adicionando um valor padrão para facilitar
+        page_title="Classifica folha de Soja",
+        layout="wide",
+        initial_sidebar_state="expanded"
     )
     
+    st.title("🌱 Classificador de Danos em Folhas de Soja")
+    st.markdown("---")
+    
+    # Sidebar para configurações
+    with st.sidebar:
+        st.header("⚙️ Configurações")
+        st.markdown("### Modelo")
+        model_url_input = st.text_input(
+            "Cole a URL do modelo (Google Drive ou Link Direto):",
+            value="",
+            help="Use um modelo em formato .tflite"
+        )
+        
+        st.markdown("### Classes")
+        classes_input_string = st.text_area(
+            "Lista de classes:",
+            value="['Caterpillar', 'Diabrotica speciosa', 'Healthy']",
+            height=100,
+            help="Formato: ['classe1', 'classe2', 'classe3']"
+        )
+    
+    # Validação e carregamento do modelo
     interpreter = None
-    classes_list = None # Variável para armazenar a lista convertida
+    classes_list = None
 
     if classes_input_string:
         try:
-            # Usamos ast.literal_eval para avaliar a string como um literal Python seguro
             classes_list = ast.literal_eval(classes_input_string)
             if not isinstance(classes_list, list):
-                 st.error("Erro na lista de classes: A entrada não é uma lista válida (deve começar e terminar com colchetes []).")
-                 classes_list = None
+                st.error("❌ Erro na lista de classes: A entrada não é uma lista válida.")
+                classes_list = None
         except Exception:
-            st.error("Erro na lista de classes: Verifique a sintaxe (certifique-se de que os itens estão entre aspas simples).")
+            st.error("❌ Erro na lista de classes: Verifique a sintaxe.")
             classes_list = None
+    
     if model_url_input and classes_list is not None:
-        interpreter = carrega_modelo(model_url_input)
-
+        try:
+            with st.spinner("⏳ Carregando modelo..."):
+                interpreter = carrega_modelo(model_url_input)
+            st.success("✅ Modelo carregado com sucesso!")
+        except Exception as e:
+            st.error(f"❌ Erro ao carregar o modelo: {str(e)}")
+            interpreter = None
+    elif model_url_input or classes_list is not None:
+        st.info("ℹ️ Preencha os campos de URL do modelo e classes para começar")
+    
+    # Seção de classificação
     if interpreter is not None:
-        st.success("Modelo carregado!")
-        st.info("Agora, carregue a imagem da folha de videira para classificação.")
-        image = carrega_imagem()
+        st.markdown("---")
+        st.header("📸 Classificação de Imagem")
+        
+        col_upload, col_result = st.columns([1, 1])
+        
+        with col_upload:
+            st.subheader("Carregue uma imagem")
+            image = carrega_imagem()
+            
         if image is not None:
-            previsao(interpreter, image, classes_list)
-
-    # Carrega imagem
-
-    # Classifica
+            with col_result:
+                st.subheader("Resultados")
+                with st.spinner("🔍 Analisando imagem..."):
+                    previsao(interpreter, image, classes_list)
 
 
 if __name__=="__main__":
